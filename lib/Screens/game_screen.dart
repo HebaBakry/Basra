@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:math';  // Import for generating random numbers
 import '../Game Logic/basra.dart';
 import '../Game Logic/card.dart' as cd;
 import '../Game Logic/deck.dart';
@@ -36,6 +37,44 @@ class _GameScreenState extends State<GameScreen> {
     widget.deck.deal(widget.players, 4);  // Deal 4 cards per player initially
   }
 
+  // Method to randomly pick a card for Player 1 (Bot)
+  void playRandomCard(Player player) {
+    final random = Random();
+    int randomIndex = random.nextInt(player.hand.length);  // Pick a random card index
+    playCard(player, player.hand[randomIndex]);
+  }
+
+  // Method to determine the winner and show the dialog
+  void showWinnerDialog() {
+    String winner;
+    if (widget.players[0].totalScore > widget.players[1].totalScore) {
+      winner = widget.players[0].name;
+    } else if (widget.players[1].totalScore > widget.players[0].totalScore) {
+      winner = widget.players[1].name;
+    } else {
+      winner = "It's a tie!";
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Game Over'),
+          content: Text('Congratulations $winner, you are the winner'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop(); // Navigate back or restart the game
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // Handles player playing a card
   void playCard(Player player, cd.Card playedCard) {
     if (player == currentPlayer) {  // Only allow play on the current player's turn
@@ -44,13 +83,23 @@ class _GameScreenState extends State<GameScreen> {
 
         // Check if the players need more cards from the deck after playing
         if (widget.players[0].hand.isEmpty && widget.players[1].hand.isEmpty &&
-            widget.deck.cards.isNotEmpty && widget.deck.cards.length >= 8) {
+            widget.deck.cards.isNotEmpty && widget.deck.cards.length >= widget.players.length*4) {
           widget.deck.deal(widget.players, 4);  // Deal 4 more cards to the players
+        }
+        else if((widget.deck.cards.isEmpty || widget.deck.cards.length < widget.players.length*4) && (widget.players[0].hand.isEmpty && widget.players[1].hand.isEmpty)){
+          showWinnerDialog();
         }
 
         // Switch to the next player
         currentPlayerIndex = (currentPlayerIndex + 1) % widget.players.length;
         currentPlayer = widget.players[currentPlayerIndex];
+
+        // Automatically play for Player 1 if it's their turn (Bot)
+        if (currentPlayerIndex == 1) {
+          Future.delayed(Duration(seconds: 1), () {
+            playRandomCard(widget.players[1]);
+          });
+        }
       });
     }
   }
@@ -82,53 +131,53 @@ class _GameScreenState extends State<GameScreen> {
               );
             }).toList(),
           ),
-          const SizedBox(height: 40),
-
-        Expanded(child: Column(
-          children: [
-            // Player 1's cards (Bot)
-            Row(
+          Expanded(
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: widget.players[1].hand.map((card) {
-                // Show the back of the card if it's not Player 1's turn
-                return CardWidget(
-                  card: card,
-                  showBack:true,  // Show back if it's not Player 1's turn
-                  isHighlighted: currentPlayerIndex == 1,  // Highlight Player 1's cards if it's their turn
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 30),  // Spacing between player 1 and floor
+              children: [
+                // Player 1's cards (Bot)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: widget.players[1].hand.map((card) {
+                    return CardWidget(
+                      card: card,
+                      showBack: true,  // Always show the back of the bot's cards
+                      isHighlighted: currentPlayerIndex == 1,  // Highlight Player 1's cards if it's their turn
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 30),  // Spacing between player 1 and floor
 
-            // Display floor cards in the middle
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: widget.floor.cardsOnFloor
-                    .map((card) => CardWidget(card: card))
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 30),  // Spacing between floor and player 0
-
-            // Player 0's cards (at the bottom)
-            const Text('Your Cards', style: TextStyle(fontSize: 18)),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: widget.players[0].hand.map((card) {
-                // Add shadow to indicate it's Player 0's turn
-                return GestureDetector(
-                  onTap: () => playCard(widget.players[0], card),  // Play card on tap
-                  child: CardWidget(
-                    card: card,
-                    isHighlighted: currentPlayerIndex == 0,  // Highlight Player 0's cards if it's their turn
+                // Display floor cards in the middle
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: widget.floor.cardsOnFloor
+                        .map((card) => CardWidget(card: card))
+                        .toList(),
                   ),
-                );
-              }).toList(),
+                ),
+                const SizedBox(height: 30),  // Spacing between floor and player 0
+
+                // Player 0's cards (at the bottom)
+                const Text('Your Cards', style: TextStyle(fontSize: 18)),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: widget.players[0].hand.map((card) {
+                    // Add shadow to indicate it's Player 0's turn
+                    return GestureDetector(
+                      onTap: () => playCard(widget.players[0], card),  // Play card on tap
+                      child: CardWidget(
+                        card: card,
+                        isHighlighted: currentPlayerIndex == 0,  // Highlight Player 0's cards if it's their turn
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
             ),
-          ],
-        )),
+          ),
           const SizedBox(height: 20),
 
           // Display remaining cards in the deck
